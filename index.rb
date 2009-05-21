@@ -1,35 +1,139 @@
 require 'rubygems'
 require 'sinatra'
+require 'sinatra/r18n'
 require 'mysql'
 require 'activerecord'
 require 'yaml'
 require 'net/http'
 require 'exifr'
+require 'RMagick'
 
 
 
 
 set :root, File.dirname(__FILE__)
 
-#set :static, true
-#set :public, Proc.new { File.join(root, "static") }
+
 
 set :public, File.dirname(__FILE__) + '/static'
-#static '/static', 'static'
+
 set :views, File.dirname(__FILE__) + '/views'
 
 
  
-dbconfig = YAML::load(File.open(File.dirname(__FILE__)+'/database.yml'))
+$config = YAML::load(File.open(File.dirname(__FILE__)+'/config.yml'))
 
-ActiveRecord::Base.establish_connection(dbconfig)
+ActiveRecord::Base.establish_connection($config)
 
 class Resource < ActiveRecord::Base 
+	def tags2HTML
+		return "--" if self.tags.nil?
+		self.tags+"_test"
+		self.tags.split(",").map{|s| "<a href='/tag/#{s}'>#{s}</a>"}.join(", ")
+	end
+	
+	def imgHTML
+		return "<img src='/res/img/#{self.id}' id='image' exif='true' />"
+	end
+	
+	def exif?
+		begin
+			obj = EXIFR::JPEG.new(self.filepath)
+		rescue 
+			return false
+		end
+		return !obj.nil?
+	end
+	
+	def image?
+		return "image"==self.kind
+	end
+	
+	def previewHTML
+		return "<a href='/res/img/#{self.id}/full'><img src='/res/img/#{self.id}/preview/#{$config["thumbsize"]}' /></a>" if self.image?
+		"test"
+	end
+	
+	def outerHelper(field)
+		"<div id='#{field}_container' title='Title'>"+eval("self.#{field}_helper")+"</div>"
+	end
+	
+	def title_helper
+		"<span class='con'>#{self.title}</span>"
+	end
+	
+	def id_helper
+		"<span class='big'>ID</span>: <a href='/res/#{self.id}'>##{self.id}</a>"
+	end
+	
+	def description_helper
+		"<span class='big'>#{t("res.Description")}</span>: 
+			#{(self.description.nil? or self.description.length==0) ? t("res.Hvc")+"<span class='con'></span>" : "<span class='con'>"+self.description+"</span>"}"
+	end
+	
+	def sourceURL_helper
+		"<span class='big'>#{t("res.Source")}</span>: 
+			#{(self.sourceURL.nil? or self.sourceURL.length==0) ? t("res.Hvsour")+"<span class='con'></span>" : "<span class='con'>"+self.sourceURL+"</span>"}"
+	end
+	
+	def tags_helper
+		"<span class='big'>#{t("res.Tags")}</span>: 
+			#{self.tags2HTML}
+			<span class='con' style='display:none;'>#{self.tags}</span>"
+	end
+	
+	def filepath_helper
+		"<span class='big'>#{t("res.Path")}</span>: 
+			<a href='/res/img/#{self.id}/full'><span class='con'>#{self.filepath}</span></a> "
+	end
+	
+	def getDate
+		self.date.strftime("%Y-%m-%d  %H:%M:%S")
+	end
+	
+	def date_helper
+		"<span class='big'>#{t("res.Date")}</span>: 
+			<span class='con'>#{self.getDate}</span>"
+	end	
+	
+	def mimetype_helper
+		"<span class='big'>#{t("res.mimetype")}</span>: 
+			<span class='con'>#{self.mimetype}</span>"
+	end	
+	
+	def kind_helper
+		"<span class='big'>#{t("res.kind")}</span>:
+			#{t(self.kind)}
+			<span class='con' style='display:none;'>#{self.kind}</span>"
+	end
+	
+	
+	#dirty, dirty hack...
+	@i18n
+	def t (str)
+		return eval("@i18n."+str)
+	end
+	
+	def i18n=(value)
+		@i18n = value
+	end
+	
+	
+	def deleteAttach
+		File.delete(self.filepath) unless self.filepath.nil?
+	end
+	
+	def to_tr
+		"<tr><td><a href='/res/#{self.id}'>##{self.id}</a></td> <td>#{self.previewHTML}</td> <td><a href='/res/#{self.id}'>#{self.title}</a></td> <td>#{self.tags2HTML}</td> <td>#{self.getDate}</td></tr>\n"
+	end
 end
 
-#r = Resource.new(:title => "test")
 
-#$f = r.inspect
+
+
+
+
+
 
 
 
@@ -54,100 +158,109 @@ end
 
 
 
-func = proc{|x,y| x + y }
-
-def tag(params)
-  "<#{params[:tagName]}>#{params[:content]}</#{params[:tagName]}>"
-end
-
-
-def getPath(title)
-    return title if title.length<3
-    return "#{title[0].chr}/#{title[1].chr}/"+title[2..-1]
-end
-
-
 
 
 
 get '/' do
-  headers['Content-type'] = 'text/html';
-  erb :index
-  #'<i>111</i>'
+  #params[:locale] = $config["locale"]
+  index(params)
 end
 
 
-get '/test/:test' do
-  getPath params[:test]
-end
-
-get '/testbd' do
-  "test user num: "+User.all(:conditions => "name regexp 't'")[0].id.to_s
+get %r{$/([a-z]{2,3})^} do
+  params[:locale] = params["captures"][0]
+  index(params)
 end
 
 
+def index(params)
+	headers['Content-type'] = 'text/html;charset=UTF-8';
+	$res = Resource.find(:all, :order => "id DESC", :limit => $config["indexLimit"])
+	erb :index
+end
 
-get '/load' do
+
+
+get '/load/:locale' do
+	load(params)
+end
+
+get '/load/?' do
+	#params[:locale] = $config["locale"]
+	load(params)
+end
+
+
+def load(params)
+  
+  header['Content-type'] = 'text/html;charset=UTF-8';
   
  if params[:url]==nil
-    '<form method="get" action="/load"><input type="text" name="url" /></form>' 
+	erb :load
  else 
 
 
-
+ 
    require 'uri'
    
    fileInfo = {}
    def fileInfo.filename
-		raise 'Have not file extension!' if self[:ext].nil?
-		raise 'Have not file title!' if self[:title].nil?
+		raise i18n.errors.notHaveExt if self[:ext].nil?
+		raise i18n.errors.notHaveTitle if self[:title].nil?
 		self[:title]+"."+self[:ext]
    end
    
    def fileInfo.path
-		File.dirname(__FILE__)+"/static/resources/"+self.filename
+		"static/resources/"+self.filename
    end
    
-      
+   
    begin 
 	 url = URI.parse(params[:url]) 
 	 matches = url.path.split(/([a-zA-Z0-9]+).([a-zA-Z0-9]+)$/)
-	 raise 'Uncorrect uri: have not file name!' if matches.length<3
-	 fileInfo[:title] = matches[1]
+	 raise i18n.errors.notFileName if matches.length<3
+	 fileInfo[:title] = params[:defaultTitle].nil? ? matches[1] : params[:defaultTitle]
 	 fileInfo[:ext] = matches[2]
    rescue 
-     return errorPage(:text=>$!.message, :title=>"Parsing error")
+     return errorPage(:text=>$!.message, :title=>i18n.errors.title.parsing)
    end
+   
    
    request = Net::HTTP::Get.new(url.path)
 	
-    
+    t=""
   begin
     res = Net::HTTP.start(url.host, url.port) {|http|
-     raise "Same named file (#{fileInfo.filename}) yet exists! Try load with get parameter `defaultTitle`." if File.exists?(fileInfo.path) and params[:yes].nil?
+     raise i18n.errors.yetExists(fileInfo.filename) + "<br /> <form action='/load' method='get'><input type='hidden' name='url' value='#{params[:url]}' /><input type='text' value='#{fileInfo[:title]}_' name='defaultTitle' /><input type='submit' value='go' /></form>" if File.exists?(fileInfo.path) and params[:yes].nil?
      resp = http.get(url.path)
+
+	 raise i18n.errors.notFound if resp.code=="404"
 	 fileInfo[:mime] = resp.content_type
 	 fileInfo[:type] = fileInfo[:mime].gsub(/([\w]+)\/(.*)/, '\1')
-	 raise "Error type of resourse!<br />Mime-type: #{fileInfo[:mime]}<br />Requested type: #{params[:type]}" if !params[:type].nil? and params[:type] != fileInfo[:type]
+	 raise i18n.errors.errorType(fileInfo[:mime], params[:type]) if !params[:type].nil? and params[:type] != fileInfo[:type]
      open(fileInfo.path, "wb") { |file|
      file.write(resp.body)
     }
    }
    rescue 
-        return errorPage(:text=>$!.message, :title=>"Socket error")
+        return errorPage(:text=>$!.message, :title=>i18n.errors.title.socket)
    end
    
+      
+
+	  
    #а вот это надо вынести потом в addResource
 #=begin
 	
 	def addResource (params)
 	#Resource(id: integer, type: string, sourceURL: string, filepath: string, mimetype: string, tags: string, description: string, date: datetime, title: string)
 		r = Resource.new do |r|
-		 r.type = params[:type] unless params[:type].nil?
+		 r.kind = params[:type] unless params[:type].nil?
 		 r.mimetype = params[:mime] unless params[:mime].nil?
 		 r.sourceURL = params[:url] unless params[:url].nil?
 		 r.filepath = params[:path] unless params[:path].nil?
 		 r.title = params[:title] unless params[:title].nil?
+		 r.date = DateTime::now()
 		end
 		r.save
 		return r.id
@@ -155,55 +268,209 @@ get '/load' do
 	
 	id = addResource :type=>fileInfo[:type], :mime=>fileInfo[:mime], :url=>params[:url], :path=>fileInfo.path, :title=>fileInfo[:title]
 
-	redirect "res/#{id}"
+	redirect "/res/#{id}/#{params[:locale]}"
    
 	
   end
 end
 
 
-get '/res/:id' do
-#здесь выводим страницу ресурса: картинки или...
-	params[:id]
-end
 
-
-
-get '/test1' do
-  '<html>
-<body>
-<img src="http://localhost:4567/files/guile_of_the_broken_by_drak.jpg" exif="true" id="MyPrettyImage">
-<script src="http://www.nihilogic.dk/labs/exif/exif.js"></script>
-<script src="http://www.nihilogic.dk/labs/binaryajax/binaryajax.js"></script>
-<script>
-  document.getElementById("MyPrettyImage").onclick = function() {
-	alert(EXIF.pretty(this));
-}
-
- // or use the EXIF.pretty() function to put all tags in one string, one tag per line.  
-</script>
-</body>
-</html>'
-end
-
-get '/test' do
-    #'test: '+EXIFR::JPEG.new(File.dirname(__FILE__)+'/static/files/4e77adb5aeab.jpg').software
-    #header['Content-type'] = 'text/plain';
-	res = ""
-	obj = EXIFR::JPEG.new(File.dirname(__FILE__)+'/static/files/guile_of_the_broken_by_drak.jpg')
-    obj.instance_variables.each{|m| res = res+"<br />"+m+"="+(obj.instance_variable_get(m).inspect)}
-	res
-	obj.inspect
+get '/res/img/:id/full' do
+	begin
+		$r = Resource.find(params[:id])
+	rescue
+		return errorPage(:text=>$!.message, :title=>"Resource ##{params[:id]} not found")
+	end
 	
-	#open("test.jpg", "wb") { |file|
-    #file.write(obj.jpeg_thumbnails)
-   #}
-   
+	header['Content-type'] = $r.mimetype
+		
+	begin
+		File.open($r.filepath).binmode.read
+	rescue
+		notFoundImage
+	end
 end
 
 
-#get %r{/([\w]+)} do
-#  params[:captures][0]
-#end
+
+get '/res/img/:id' do
+	begin
+		$r = Resource.find(params[:id])
+	rescue
+		return errorPage(:text=>$!.message, :title=>"Resource ##{params[:id]} not found")
+	end
+	
+	header['Content-type'] = $r.mimetype
+		
+	begin
+			maxwidth = $config["maxwidth"]
+			maxheight = $config["maxheight"]
+			aspectratio = maxwidth.to_f / maxheight.to_f
+		
+			img = Magick::Image.read($r.filepath).first
+			imgwidth = img.columns
+			imgheight = img.rows
+			
+			if imgwidth>maxwidth or imgheight>maxheight		
+				imgratio = imgwidth.to_f / imgheight.to_f
+				imgratio > aspectratio ? scaleratio = maxwidth.to_f / imgwidth : scaleratio = maxheight.to_f / imgheight
+				img.resize!(scaleratio)
+			end
+			
+			return img.to_blob
+	rescue
+		notFoundImage
+	end
+end
+
+
+get '/res/img/:id/preview/:size' do
+	begin
+		$r = Resource.find(params[:id])
+	rescue
+		return errorPage(:text=>$!.message, :title=>"Resource ##{params[:id]} not found")
+	end
+	
+	begin
+			header['Content-type'] = $r.mimetype
+			img = Magick::Image.read($r.filepath).first
+			max = img.columns>img.rows ? img.columns : img.rows
+			scaleratio = params[:size].to_f/max
+			img.resize!(scaleratio)
+			return img.to_blob
+	rescue
+		notFoundImage
+	end
+end
+
+
+def notFoundImage
+	#redirect '/notFound.png'
+	header['Content-type'] = "image/png"
+	File.open('static/notFound.png').binmode.read
+end
+
+
+
+
+
+
+get '/res/:id/:locale' do
+	res params
+end
+
+
+
+get '/res/:id' do
+	#params[:locale] = $config["locale"]
+	res params
+end
+
+get '/res/:id/' do
+	#params[:locale] = $config["locale"]
+	res params
+end
+
+
+
+def res(params)
+	header['Content-type'] = 'text/html;charset=UTF-8';
+
+	begin
+		$r = Resource.find(params[:id])
+		$r.i18n = i18n
+		$left = Resource.exists?(params[:id].to_i-1)
+		$right = Resource.exists?(params[:id].to_i+1)
+	rescue
+		return errorPage(:text=>$!.message, :title=>"Resource ##{params[:id]} not found")
+	end
+	
+	
+	def $r.path
+		self.filepath.gsub(/static\/(.*)/, '\1')
+	end
+
+	erb :res
+
+end
+
+
+post '/edit/:id/:field' do
+	#require 'cgi'
+	#params["data"] = CGI.unescape(params["data"])
+
+	begin
+		r = Resource.find(params[:id])
+	rescue
+		return false
+	end
+	
+	begin
+		return "false" if params["field"]=="id" or r.column_for_attribute(params["field"]).nil?
+		eval("r."+params["field"]+"=params['data']")
+		r.save
+		r.i18n = i18n
+		return eval("r."+params["field"]+"_helper")
+	rescue 
+		return "false"
+	end
+end
+
+
+
+get '/delete/:id' do
+
+	begin
+		r = Resource.find(params[:id])
+	rescue
+		return errorPage(:text=>$!.message, :title=>i18n.errors.notFound)
+	end
+	 return errorPage(:text=>i18n.delete.withAttachOrNo+"<br /><a href='/delete/#{params[:id]}?attach=yes'>#{i18n.__yes}</a> | <a href='/delete/#{params[:id]}?attach=no'>#{i18n.__no}</a>", :title=>i18n.errors.title.changeTypeOfDeleting) if(params[:attach].nil? or ("yes"!=params[:attach] and "no"!=params[:attach]))
+
+
+	
+	r.deleteAttach if("yes"==params[:attach])
+	
+	Resource.delete(params[:id])
+	
+	redirect '/'
+end
+
+
+
+get '/tag/:tag' do
+	tagSearch params
+end
+
+
+get '/tag/:locale/:tag' do
+	tagSearch params
+end
+
+
+def tagSearch(params)
+	$res = Resource.all :conditions=>"tags regexp '(,|^)#{params[:tag]}(,|$)'" #, :limit=>$config["indexLimit"]
+	$title = i18n.search.forTag + ": " + params[:tag];
+	$header = i18n.search.forTag + ": " + "<a href='/tag/#{params[:tag]}'>#{params[:tag]}</a>";
+	erb :tags
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

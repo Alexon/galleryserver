@@ -1,0 +1,17 @@
+<html>
+<head><title><%= i18n.load.title %></title></head>
+<link rel="stylesheet" type="text/css" href="/main.css" />
+<style>
+  body{
+    text-align: center;
+    margin-top: 20%;
+  }
+</style>
+<body>
+<div class='nav'><%=i18n.nav.goto%> <a href='/'><%=i18n.nav.main%></a></div>
+
+<div class='header'><%= i18n.load.title %></div>
+
+<form method="get" action="/load"><input type="text" name="url" /><input type='submit' value='<%=i18n.load.go%>' /></form>
+</body>
+</html>

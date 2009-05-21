@@ -1,0 +1,57 @@
+errors:
+  notFileName: Некорректный uri - не получить имя файла!
+  notHaveExt: Нет расширения файла!
+  notHaveTitle: Нет имени файла!
+  yetExists: Файл с похожим заголовком (%1) уже существует! Попытайтесь загрузить с get-параметром `defaultTitle`.
+  errorType: Неверный тип ресурса !<br />Mime-type - %1<br />Запрошенный тип - %2
+  notFound: Ресурс не обнаружен.
+  title:
+    parsing: Ошибка парсера
+    socket: Ошибка подключения
+    deleting: Ошибка удаления
+    changeTypeOfDeleting: Выберите тип удаления
+  
+index:
+  title: Каталогизатор
+  load_new: Загрузить новые
+  recent_uploads: Недавно загруженные
+  noneRes: Пока ресурсов нет
+  
+load:
+  title: Загрузить ресурс
+  go: Старт
+  
+nav:
+  goto: Перейти на
+  main: главную
+  back: назад
+  
+res:
+  Description: Описание
+  Hvc: —
+  Source: Источник
+  Tags: Метки
+  Path: Путь
+  Date: Дата
+  mimetype: mime-type
+  kind: вид ресурса
+  edit: Редактировать
+  cancel: Отмена
+  Hvsour: неизвестен
+  delete: Удалить этот ресурс
+  
+Send: Отправить
+
+__yes: да
+__no: нет
+
+
+  
+image: изображение
+text: текст
+
+search:
+  forTag: Поиск по тегу
+
+delete:
+  withAttachOrNo: Хотите удалить также приложенный к ресурсу файл?

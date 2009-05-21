@@ -1,0 +1,55 @@
+errors:
+  notFileName: Uncorrect uri - have not file name!
+  notHaveExt: Have not file extension!
+  notHaveTitle: Have not file title!
+  yetExists: Same named file %1 yet exists! Try load with get parameter `defaultTitle`.
+  errorType: Error type of resourse!<br />Mime-type - %1<br />Requested type - %2
+  notFound: Resource is not found.
+  title:
+    parsing: Parsing error
+    socket: Socket error
+    deleting: Deleting error
+    changeTypeOfDeleting: Select type of deleting
+
+index:
+  title: Catalogizer
+  load_new: Load new files
+  recent_uploads: Recent uploads
+  noneRes: Yet have not resources
+
+load:
+  title: Load resource
+  go: Go
+  
+nav:
+  goto: Go to
+  main: main
+  back: back
+
+res:
+  Description: Description
+  Hvc: Have not description
+  Source: Source
+  Tags: Tags
+  Path: Path
+  Date: Date
+  mimetype: mime-type
+  kind: kind
+  edit: Edit
+  cancel: Cancel
+  Hvsour: unknown
+  delete: Delete resource
+
+Send: Send
+
+image: image
+text: text
+
+__yes: yes
+__no: no
+
+search:
+  forTag: Search for tag
+
+delete:
+  withAttachOrNo: Do you want delete attachment file of resource?

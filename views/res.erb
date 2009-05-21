@@ -1,0 +1,280 @@
+<html>
+<head><title><%= $r.title %></title></head>
+<link rel="stylesheet" type="text/css" href="/main.css" />
+
+<style>
+	
+	body{
+		padding: 3em;
+	}
+	
+	table.content{
+		width: 100%;
+		height: 10em;
+		
+	}
+	
+	table td{
+		border: 1px gray dotted;
+		padding: 1em;
+	}
+	
+	table td:hover{
+		background: #F8F8FF;
+	}
+	
+	td.img{
+		 width: 70%;
+		 text-align: center;
+	}
+	
+	.description div{
+		margin-bottom: 1em;
+	}
+	
+	#editButton{
+		position: absolute;
+		visibility: hidden;
+		top: 0;
+		left: 0;
+	}
+	
+	#editButton span{
+		border: 1px gray solid;
+		cursor: pointer;
+		background: #DDD;
+	}
+		
+	form#editForm{
+		text-align: right;
+		background: #FFF;
+	}
+	
+	form#editForm textarea{
+		text-align: left;
+		height: 5em;
+	}
+	
+	
+	#title_container{
+		color: gray;
+		font-size: 200%;
+		padding: .5em;
+		text-align: center;
+	}
+	
+
+</style>
+<script>
+	var timeout = null;
+	var fieldName = null;
+	var fieldDiv = null;
+	
+	function getE(id)
+	{
+		return document.getElementById(id);
+	}
+	
+	function setHideTiOu()
+	{
+		editing = false;
+		return setTimeout('editB = document.getElementById("editButton");editB.style.visibility = "hidden";', 1500);
+	}
+	
+	function init()
+	{
+		divs = document.getElementsByTagName("DIV");
+		for(i=0;i<divs.length;i++)
+		{
+			if(divs[i].id!="id_container" && divs[i].id.match(/(.*)_container$/))
+			{
+				divs[i].onmouseover=function(e){
+					if(editing)return false;
+					clearTimeout (timeout);
+					editB = getE("editButton");
+					editB.style.visibility = "visible";
+					editB.style.top = e.clientY+12+"px";
+					editB.style.left = e.clientX+"px";
+					fieldName = this.id.replace(/(.*)_container$/, '$1');
+					//alert("1_"+fieldName);
+					fieldDiv = this;
+				}
+				divs[i].onmouseout=function(e){
+					if(editing)return false;
+					timeout = setHideTiOu();
+					//fieldName = null;
+				}
+			}
+		}
+		getE("editButton").onclick = editField;
+	}
+	
+	function getText4(fieldName)
+	{
+		el = getE(fieldName+"_container");
+		spans = el.getElementsByTagName("SPAN");
+		con = null;
+		for(i=0;i<spans.length;i++)
+			if(spans[i].className=="con")
+			{
+				con = spans[i];
+				break;
+			}
+		return con.innerHTML;
+	}
+	
+	
+	var editing = false;
+	function editField(e)
+	{
+	//alert("2_"+fieldName);
+		var e = e || window.event;
+		var target = e.target || e.srcElement;
+		
+		editing = !editing;
+		clearTimeout (timeout);
+		
+		if(editing)
+		{
+			editB = getE("editButton");
+			editB.innerHTML = "<span><%=i18n.res.cancel%></span>" + '<form id="editForm" onsubmit="return send(this);"><textarea name="textdata">'+getText4(fieldName)+'</textarea><br /><input type="submit" value="<%=i18n.Send%>" /></form>';
+		}
+		else if(target.nodeName=="SPAN")
+		{
+			editB.innerHTML = "<span><%=i18n.res.edit%></span>";
+			timeout = setHideTiOu();
+		}
+		else
+		{
+			editing = !editing;
+		}
+	}
+	
+	function send(form)
+	{
+		sendByAJAX("/edit/<%=$r.id%>/"+fieldName, "data="+encodeURIComponent(form.textdata.value), 
+			function(answer){
+				//alert(answer);
+				if(answer)fieldDiv.innerHTML = answer;
+				editB = getE("editButton");
+				editB.innerHTML = "<span><%=i18n.res.edit%></span>";
+				editB.style.visibility = "hidden";
+				editing = false;
+			}
+		);
+		return false;
+	}
+	
+	
+	function sendByAJAX(url, content, callback)
+	{
+	if (!window.XMLHttpRequest)
+		return false;
+
+	var sendDoc = new window.XMLHttpRequest();
+	if (typeof(callback) != "undefined")
+	{
+		sendDoc.onreadystatechange = function ()
+		{
+			if (sendDoc.readyState != 4)
+				return;
+
+			if (sendDoc.responseText != null && sendDoc.status == 200)
+				callback(sendDoc.responseText);
+			else
+				callback(false);
+		};
+	}
+	sendDoc.open('POST', url, true);
+	if (typeof(sendDoc.setRequestHeader) != "undefined")
+		sendDoc.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+	sendDoc.send(content);
+
+	return true;
+	}
+
+	
+</script>
+<body onload='init();'>
+
+<div class='nav'><%=i18n.nav.goto%> <a href='/'><%=i18n.nav.main%></a></div>
+
+<div id='editButton'><span><%=i18n.res.edit%></span></div>
+
+
+
+<div class='arrow'>
+<%=if($left)
+ "<a href='/res/#{$r.id-1}'>←</a>"
+else
+ " "
+end %>
+
+<%=if($right)
+ "<a href='/res/#{$r.id+1}'>→</a>"
+else
+ " "
+end %>
+
+</div>
+
+
+<%=$r.outerHelper("title")%>
+
+<% if($r.kind=="image") %>
+<table class='content'>
+ <tr>
+	<td class='img'>
+	 <%= $r.imgHTML %>
+	</td>
+	<td>
+	 <div class='description'>
+		<%=
+		fields = ["id", "description", "sourceURL", "tags", "filepath", "date", "mimetype", "kind"]
+		str = ""
+		fields.each do |field|
+			str += $r.outerHelper(field)
+		end
+		str
+		%>
+
+
+	 <script>
+	 	var big = false;
+		var trueImgSRC = getE("image").src;
+		function resize(e)
+		{
+				big = !big;
+				trueImgSRC = big ? trueImgSRC+"/full" : trueImgSRC.replace(/\/full.*/, '')
+				this.src =  trueImgSRC //+ "?" + Math.random();
+		}
+		getE("image").onclick = resize;
+	 </script>
+	 <% if($r.exif?) %>
+		<div id="exif"></div>
+		<script src="/js/exif.js"></script>
+		<script src="/js/binaryajax.js"></script>
+		<script>
+			document.getElementById("image").onclick = function() {
+				exifTxt = EXIF.pretty(this)
+				if(exifTxt!="")
+					document.getElementById('exif').innerHTML = 
+						"<span class='big'>EXIF</span>: <br />"+exifTxt;				
+			}
+
+			setTimeout('img=getE("image");img.onclick();img.onclick=resize;', 1000);
+
+		</script>
+	 <% end %>
+
+	 </div>
+	</td>
+ </tr>
+</table>
+
+<% end %>
+
+<div style="position:absolute;bottom:1em;right:1em;"><a href="/delete/<%=$r.id%>"><%=i18n.res.delete%></a></div>
+
+</body>
+</html>

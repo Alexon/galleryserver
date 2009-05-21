@@ -1,5 +1,5 @@
 <html>
-<head><title><%= i18n.index.title %></title></head>
+<head><title><%= $title %></title></head>
 <link rel="stylesheet" type="text/css" href="/main.css" />
 <style>
 	
@@ -32,8 +32,9 @@
 
 </style>
 <body>
-<div class='nav'><a href='/load'><%= i18n.index.load_new %></a></div>
-<div class='header'><%= i18n.index.recent_uploads %></div>
+<div class='nav'><%=i18n.nav.goto%> <a href='/'><%=i18n.nav.main%></a></div>
+
+<div class='header'><%= $header %></div>
 <%= 
 s=""
 if($res.length>0)

@@ -1,0 +1,12 @@
+adapter: mysql
+database:  gs
+username: root
+password: 
+host:      localhost
+
+locale: en
+maxwidth: 400
+maxheight: 400
+
+indexLimit: 15
+thumbsize: 100

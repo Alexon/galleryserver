@@ -1,0 +1,22 @@
+	.nav{
+		position: absolute;
+		top: 0;
+		right: 1em;
+		color: gray;
+	}
+
+	.arrow{
+		position: absolute;
+		top: .5em;
+		left: 1em;
+	}
+	
+
+	.big{
+		font-size: 120%;
+		color: #555;
+	}
+	
+	img{
+		border: 0;
+	}

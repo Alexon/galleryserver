@@ -1,6 +1,26 @@
 <html>
 <head><title><%= $error.title %></title></head>
+<link rel="stylesheet" type="text/css" href="/main.css" />
+<style>
+	body{
+		padding: 20%;
+	}
+	
+	.errorReporting{
+		font-size: 150%;
+		color: gray;
+		text-align: center;
+	}
+	
+	.back{
+		position: absolute;
+		left: 1em;
+		top: 0;
+	}
+</style>
 <body>
-<%= $error.text %>
+<div class='errorReporting'><%= $error.text %></div>
+<div class='nav'><%=i18n.nav.goto%> <a href='/'><%=i18n.nav.main%></a></div>
+<div class='back'> <a href='javascript:history.go(-1)'><%=i18n.nav.back%></a></div>
 </body>
 </html>
