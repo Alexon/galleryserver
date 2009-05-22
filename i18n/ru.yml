@@ -17,6 +17,9 @@ index:
   recent_uploads: Недавно загруженные
   noneRes: Пока ресурсов нет
   
+tags:
+  notFound: не обнаружено
+  
 load:
   title: Загрузить ресурс
   go: Старт

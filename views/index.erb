@@ -34,6 +34,7 @@
 <body>
 <div class='nav'><a href='/load'><%= i18n.index.load_new %></a></div>
 <div class='header'><%= i18n.index.recent_uploads %></div>
+<%= pagin $page, $max %>
 <%= 
 s=""
 if($res.length>0)

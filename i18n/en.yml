@@ -16,6 +16,9 @@ index:
   load_new: Load new files
   recent_uploads: Recent uploads
   noneRes: Yet have not resources
+  
+tags:
+  notFound: not found
 
 load:
   title: Load resource

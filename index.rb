@@ -73,7 +73,7 @@ class Resource < ActiveRecord::Base
 	
 	def sourceURL_helper
 		"<span class='big'>#{t("res.Source")}</span>: 
-			#{(self.sourceURL.nil? or self.sourceURL.length==0) ? t("res.Hvsour")+"<span class='con'></span>" : "<span class='con'>"+self.sourceURL+"</span>"}"
+			#{(self.sourceURL.nil? or self.sourceURL.length==0) ? t("res.Hvsour")+"<span class='con'></span>" : "<a href='#{self.sourceURL}'><span class='con'>#{self.sourceURL}</span></a>"}"
 	end
 	
 	def tags_helper
@@ -175,7 +175,12 @@ end
 
 def index(params)
 	headers['Content-type'] = 'text/html;charset=UTF-8';
-	$res = Resource.find(:all, :order => "id DESC", :limit => $config["indexLimit"])
+	
+	$count = Resource.count
+	$max = ($count/$config["indexLimit"].to_f).floor
+	$page = params[:page].nil? ? $max : params[:page].to_i
+	
+	$res = Resource.find :all, :order => "id ASC", :limit => $config["indexLimit"], :offset => $page*$config["indexLimit"].to_i, :order => :id
 	erb :index
 end
 
@@ -216,8 +221,9 @@ def load(params)
    
    
    begin 
-	 url = URI.parse(params[:url]) 
-	 matches = url.path.split(/([a-zA-Z0-9]+).([a-zA-Z0-9]+)$/)
+	 url = URI.parse(params[:url])
+	 #matches = url.path.split(/([a-zA-Z0-9]+).([a-zA-Z0-9]+)$/)
+	 matches = (File.basename url.path).split(/([a-zA-Z0-9]+).([a-zA-Z0-9]+)$/)
 	 raise i18n.errors.notFileName if matches.length<3
 	 fileInfo[:title] = params[:defaultTitle].nil? ? matches[1] : params[:defaultTitle]
 	 fileInfo[:ext] = matches[2]
@@ -232,7 +238,7 @@ def load(params)
   begin
     res = Net::HTTP.start(url.host, url.port) {|http|
      raise i18n.errors.yetExists(fileInfo.filename) + "<br /> <form action='/load' method='get'><input type='hidden' name='url' value='#{params[:url]}' /><input type='text' value='#{fileInfo[:title]}_' name='defaultTitle' /><input type='submit' value='go' /></form>" if File.exists?(fileInfo.path) and params[:yes].nil?
-     resp = http.get(url.path)
+     resp = http.get(url.path, "User-Agent" => "Mozilla/5.0 (Windows; U; Windows NT 6.0; ru; rv:1.9.0.10) Gecko/2009042316 Firefox/3.0.10")
 
 	 raise i18n.errors.notFound if resp.code=="404"
 	 fileInfo[:mime] = resp.content_type
@@ -249,8 +255,6 @@ def load(params)
       
 
 	  
-   #а вот это надо вынести потом в addResource
-#=begin
 	
 	def addResource (params)
 	#Resource(id: integer, type: string, sourceURL: string, filepath: string, mimetype: string, tags: string, description: string, date: datetime, title: string)
@@ -375,6 +379,7 @@ end
 
 
 def res(params)
+
 	header['Content-type'] = 'text/html;charset=UTF-8';
 
 	begin
@@ -399,7 +404,11 @@ end
 post '/edit/:id/:field' do
 	#require 'cgi'
 	#params["data"] = CGI.unescape(params["data"])
+	edit params
+end
 
+
+def edit(params)
 	begin
 		r = Resource.find(params[:id])
 	rescue
@@ -429,8 +438,11 @@ get '/delete/:id' do
 	 return errorPage(:text=>i18n.delete.withAttachOrNo+"<br /><a href='/delete/#{params[:id]}?attach=yes'>#{i18n.__yes}</a> | <a href='/delete/#{params[:id]}?attach=no'>#{i18n.__no}</a>", :title=>i18n.errors.title.changeTypeOfDeleting) if(params[:attach].nil? or ("yes"!=params[:attach] and "no"!=params[:attach]))
 
 
-	
-	r.deleteAttach if("yes"==params[:attach])
+	begin
+		r.deleteAttach if("yes"==params[:attach])
+	rescue
+		nil
+	end
 	
 	Resource.delete(params[:id])
 	
@@ -448,14 +460,32 @@ get '/tag/:locale/:tag' do
 	tagSearch params
 end
 
-
 def tagSearch(params)
-	$res = Resource.all :conditions=>"tags regexp '(,|^)#{params[:tag]}(,|$)'" #, :limit=>$config["indexLimit"]
+	$count = Resource.count :conditions=>"tags regexp '(,|^)#{params[:tag]}(,|$)'"
+	$max = ($count/$config["indexLimit"].to_f).floor
+	$page = params[:page].nil? ? $max : params[:page].to_i
+
+	#return $page.to_s
+	#return pagin $page, $max
+	
+	$res = Resource.all :conditions=>"tags regexp '(,|^)#{params[:tag]}(,|$)'", :limit=>$config["indexLimit"], :offset=>$page*$config["indexLimit"].to_i
 	$title = i18n.search.forTag + ": " + params[:tag];
 	$header = i18n.search.forTag + ": " + "<a href='/tag/#{params[:tag]}'>#{params[:tag]}</a>";
 	erb :tags
 end
 
+
+def pagin(page, max)
+	s = ""
+	(0..max).to_a.each do |n|
+		if(page!=n)
+			s+="<a href='?page=#{n}'>#{n}</a> "
+		else
+			s+="<b>#{n}</b> "
+		end
+	end
+	s
+end
 
 
 

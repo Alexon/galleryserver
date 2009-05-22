@@ -35,6 +35,7 @@
 <div class='nav'><%=i18n.nav.goto%> <a href='/'><%=i18n.nav.main%></a></div>
 
 <div class='header'><%= $header %></div>
+<%= pagin $page, $max %>
 <%= 
 s=""
 if($res.length>0)
@@ -42,7 +43,7 @@ if($res.length>0)
  $res.each do |r| s+=r.to_tr end
  s += "</table></div>"
 else
- s = "(#{i18n.index.noneRes})"
+ s = "(#{i18n.tags.notFound})"
 end
  s %>
 </body>

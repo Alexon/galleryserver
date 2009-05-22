@@ -78,7 +78,7 @@
 	function setHideTiOu()
 	{
 		editing = false;
-		return setTimeout('editB = document.getElementById("editButton");editB.style.visibility = "hidden";', 1500);
+		return setTimeout('editB = document.getElementById("editButton");editB.style.visibility = "hidden";', <%=$config["resTimeOut"]%>);
 	}
 	
 	function init()
@@ -230,9 +230,8 @@ end %>
 	<td>
 	 <div class='description'>
 		<%=
-		fields = ["id", "description", "sourceURL", "tags", "filepath", "date", "mimetype", "kind"]
 		str = ""
-		fields.each do |field|
+		["id", "description", "sourceURL", "tags", "filepath", "date", "mimetype", "kind"].each do |field|
 			str += $r.outerHelper(field)
 		end
 		str
@@ -251,7 +250,7 @@ end %>
 		getE("image").onclick = resize;
 	 </script>
 	 <% if($r.exif?) %>
-		<div id="exif"></div>
+		<div id="exif">exif</div>
 		<script src="/js/exif.js"></script>
 		<script src="/js/binaryajax.js"></script>
 		<script>
