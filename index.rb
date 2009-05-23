@@ -464,9 +464,6 @@ def tagSearch(params)
 	$count = Resource.count :conditions=>"tags regexp '(,|^)#{params[:tag]}(,|$)'"
 	$max = ($count/$config["indexLimit"].to_f).floor
 	$page = params[:page].nil? ? $max : params[:page].to_i
-
-	#return $page.to_s
-	#return pagin $page, $max
 	
 	$res = Resource.all :conditions=>"tags regexp '(,|^)#{params[:tag]}(,|$)'", :limit=>$config["indexLimit"], :offset=>$page*$config["indexLimit"].to_i
 	$title = i18n.search.forTag + ": " + params[:tag];

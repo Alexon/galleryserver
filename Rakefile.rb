@@ -6,8 +6,7 @@ require 'find'
 
 Kernel::system('chcp 1251>nul')
 
-#Encoding.default_external = Encoding.find(Encoding.locale_charmap)
-#Encoding.default_internal = __ENCODING__
+
 
 
 task :default => :migrate
@@ -23,7 +22,6 @@ task :environment do
 end
 
 
-#task :default => :tsto
 
 desc "TSTO x!"
 task :tsto do
@@ -70,18 +68,15 @@ task :add => :environment do
 		end
 		
 	begin
-		#если веб-файл, то обрабатываем так...
 		if(ENV["input"] =~ /^http:\/\//)
 			result = load(:url=>ENV["input"], :tags=>ENV["tags"], :description=>ENV["descr"])
 			puts result
 			log result
 		else
 			input = ENV["input"].gsub(/\\/, "/")
-			# если файл, то обрабатываем так...
 			if File.size? ENV["input"]
 				accountFile input
 			else
-			#если папка, обрабатываем так...
 				accountDir input
 			end
 		end
@@ -201,7 +196,6 @@ def load ( params )
 	  
 	
 	def addResource (params)
-	#Resource(id: integer, type: string, sourceURL: string, filepath: string, mimetype: string, tags: string, description: string, date: datetime, title: string)
 		r = Resource.new do |r|
 		 r.kind = params[:type] unless params[:type].nil?
 		 r.mimetype = params[:mime] unless params[:mime].nil?
