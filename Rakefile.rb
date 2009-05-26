@@ -9,36 +9,13 @@ Kernel::system('chcp 1251>nul')
 
 
 
-task :default => :migrate
-
-desc "Migrate the database through scripts in db/migrate. Target specific version with VERSION=x"
-task :migrate => :environment do
-  ActiveRecord::Migrator.migrate('db/migrate', ENV["VERSION"] ? ENV["VERSION"].to_i : nil )
-end
-
-task :environment do
-  ActiveRecord::Base.establish_connection(YAML::load(File.open('config.yml')))
-  ActiveRecord::Base.logger = Logger.new(File.open('database.log', 'a'))
-end
-
-
-
-desc "TSTO x!"
-task :tsto do
-	if ENV["test"]!=nil 
-		puts "test:"+ENV["test"]
-	else
-		puts "Haven't param!"
-	end
-end
-
 
 
 
 $syshash = "\\"
 
 
-task :default => :add
+#task :default => :add
 
 def log(text)
 	File.open("rakelog.txt", "a+"){|f| f.write(text+"\n");}
@@ -46,6 +23,8 @@ end
 
 desc "Task for Adding"
 task :add => :environment do
+
+
 	if ENV["input"]!=nil 
 
 		class Resource < ActiveRecord::Base
@@ -66,10 +45,10 @@ task :add => :environment do
 				end
 			end
 		end
-		
+	
 	begin
 		if(ENV["input"] =~ /^http:\/\//)
-			result = load(:url=>ENV["input"], :tags=>ENV["tags"], :description=>ENV["descr"])
+			result = loadFile(:url=>ENV["input"], :tags=>ENV["tags"], :description=>ENV["descr"])
 			puts result
 			log result
 		else
@@ -127,28 +106,11 @@ def accountDir input
 end
 
 
+
 $infoHash = {"jpg"=>"image/jpeg", "gif"=>"image/gif", "png"=>"image/png"}
 
-def accountFile input
-	ext = File.extname(input).gsub(".", "")
-	puts ext
-	
-	mimetype = $infoHash[ext]
-	if mimetype.nil?
-		mimetype = "text/plain" 
-		kind = "text"
-	else
-		kind = mimetype.gsub(/^([a-z]*)\/.*/, '\1')
-	end
-	
-	look4File input, :ext=>ext, :mimetype=>mimetype, :kind=>kind
-end
+def loadFile ( params )
 
-
-
-def load ( params )
-
-   
    fileInfo = {}
    def fileInfo.filename
 		raise "Have not extension" if self[:ext].nil?
@@ -170,11 +132,10 @@ def load ( params )
    rescue 
      return "Parsing error: "+$!.message
    end
-   
+
    
    request = Net::HTTP::Get.new(url.path)
 	
-    t=""
   begin
     res = Net::HTTP.start(url.host, url.port) {|http|
      raise 'file yet exists; try load with param `dTitle`' if File.exists?(fileInfo.path)
@@ -189,13 +150,13 @@ def load ( params )
    }
    rescue 
         return 'Socket error: '+$!.message
-   end
+end
    
-      
+
 
 	  
 	
-	def addResource (params)
+def addResource (params)
 		r = Resource.new do |r|
 		 r.kind = params[:type] unless params[:type].nil?
 		 r.mimetype = params[:mime] unless params[:mime].nil?
@@ -207,15 +168,49 @@ def load ( params )
 		end
 		r.save
 		return r.id
-	end
+end
 	
 	id = addResource :type=>fileInfo[:type], :mime=>fileInfo[:mime], :url=>params[:url], :path=>fileInfo.path, :title=>fileInfo[:title], :tags=>params[:tags], :description=>params[:description]
 
 	return  "saved as ##{id}"
-   
+
+end
+
+
+def accountFile input
+	ext = File.extname(input).gsub(".", "")
+	puts ext
+	
+	mimetype = $infoHash[ext]
+	if mimetype.nil?
+		mimetype = "text/plain" 
+		kind = "text"
+	else
+		kind = mimetype.gsub(/^([a-z]*)\/.*/, '\1')
+	end
+	
+	look4File input, :ext=>ext, :mimetype=>mimetype, :kind=>kind
 end
 
 
 
 
+
+
+
+
+
+
+  
+task :default => :migrate
+
+desc "Migrate the database through scripts in db/migrate. Target specific version with VERSION=x"
+task :migrate => :environment do
+  ActiveRecord::Migrator.migrate('db/migrate', ENV["VERSION"] ? ENV["VERSION"].to_i : nil )
+end
+
+task :environment do
+  ActiveRecord::Base.establish_connection(YAML::load(File.open('config.yml')))
+  ActiveRecord::Base.logger = Logger.new(File.open('database.log', 'a'))
+end
 
