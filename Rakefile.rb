@@ -132,11 +132,13 @@ def loadFile ( params )
    def fileInfo.filename
 		raise "Have not extension" if self[:ext].nil?
 		raise "Have not title" if self[:title].nil?
-		fn = self[:title]+"."+self[:ext]
-		if RUBY_PLATFORM.match(/win/)
-			ic = Iconv.new('WINDOWS-1251','UTF-8')
-			fn = ic.iconv(fn)
-		end
+		#fn = self[:title]+"."+self[:ext]
+		#if RUBY_PLATFORM.match(/win/)
+		#	ic = Iconv.new('WINDOWS-1251','UTF-8')
+		#	fn = ic.iconv(fn)
+		#end
+		require "digest"
+		fn = Digest::MD5.hexdigest(DateTime::now().to_s) + "." + self[:ext]
 		fn
    end
    
@@ -190,6 +192,7 @@ def loadFile ( params )
 	 fileInfo[:type] = fileInfo[:mime].gsub(/([\w]+)\/(.*)/, '\1')
      open(fileInfo.path, "wb") { |file|
      file.write(resp.body)
+	 file.close
     }
    }
    rescue 

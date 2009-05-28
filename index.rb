@@ -28,6 +28,13 @@ $config = YAML::load(File.open(File.dirname(__FILE__)+'/config.yml'))
 ActiveRecord::Base.establish_connection($config)
 
 class Resource < ActiveRecord::Base 
+	def Resource.find_max
+		begin 
+			(Resource.find :all, :order => "id desc", :limit => 1)[0].id
+		rescue
+			0
+		end
+	end
 	def tags2HTML
 		return "--" if self.tags.nil?
 		self.tags+"_test"
@@ -66,6 +73,8 @@ class Resource < ActiveRecord::Base
 	end
 	
 	def title_helper
+		#title = (self.title.nil? or self.title.length==0) ? "-?-" : self.title
+		return "<span>-?-<span class='con'></span></span>" if (self.title.nil? or self.title.length==0)
 		"<span class='con'>#{self.title}</span>"
 	end
 	
@@ -212,17 +221,16 @@ def load(params)
  else 
  
 
-   
+   #return Resource.find_max.inspect
    
    fileInfo = {}
    def fileInfo.filename
 		raise self[:i18n].errors.notHaveExt if self[:ext].nil?
 		raise self[:i18n].errors.notHaveTitle if self[:title].nil?
-		fn = self[:title]+"."+self[:ext]
-		if RUBY_PLATFORM.match(/win/)
-			ic = Iconv.new('WINDOWS-1251','UTF-8')
-			fn = ic.iconv(fn)
-		end
+		#fn = self[:title]+"."+self[:ext]
+		#fn = (Resource.find_max + 1).to_s + "." + self[:ext]
+		fn = Digest::MD5.hexdigest(DateTime::now().to_s) + "." + self[:ext]
+
 		fn
    end
    fileInfo[:i18n] = i18n
@@ -238,8 +246,14 @@ def load(params)
 		rescue 
 			url = URI.parse(URI.encode params[:url])
 		end
-	 s = (File.basename URI.decode url.path).gsub(/[\?\*\|<>\\\/\:]/, "")
-	 matches = s.split(/.([a-zA-Z0-9]{3,4})$/)
+	 s = ((URI.decode params[:url]).gsub(/^.*\/([^\/]*)$/, '\1'))
+	 #s = "-?-" if s.length==0
+	 #if RUBY_PLATFORM.match(/win/)
+	#	ic = Iconv.new('UTF-8','WINDOWS-1251')
+	#	s = ic.iconv(s)
+	#end
+	 #s.gsub!(/[\?\*\|<>\\\/\:]/, "")
+	 matches = s.split(/\.([a-zA-Z0-9]{3,4})$/)
 	 if matches.length>1
 		fileInfo[:title] = params[:defaultTitle].nil? ? matches[0] : params[:defaultTitle]
 		fileInfo[:ext] = matches[1]
@@ -247,6 +261,8 @@ def load(params)
 		fileInfo[:title] = s
 		fileInfo[:ext] = nil
 	 end
+	 
+	# return matches.inspect
 	 
    rescue 
      return errorPage(:text=>$!.message, :title=>i18n.errors.title.parsing)
@@ -259,9 +275,10 @@ def load(params)
 	
     t=""
   begin
+   t = "1"
     res = Net::HTTP.start(url.host, url.port) {|http|
      resp = http.get(url.path, "User-Agent" => "Mozilla/5.0 (Windows; U; Windows NT 6.0; ru; rv:1.9.0.10) Gecko/2009042316 Firefox/3.0.10")
-
+t = "2"
 	 raise i18n.errors.notFound if resp.code=="404"
 	 fileInfo[:mime] = resp.content_type
 	 if fileInfo[:ext].nil?
@@ -274,15 +291,19 @@ def load(params)
 		end
 	 end
 	 fileInfo[:type] = fileInfo[:mime].gsub(/([\w]+)\/(.*)/, '\1')
+     #t = fileInfo.path
      raise i18n.errors.yetExists(fileInfo.filename) + "<br /> <form action='/load' method='get'><input type='hidden' name='url' value='#{params[:url]}' /><input type='text' value='#{fileInfo[:title]}_' name='defaultTitle' /><input type='submit' value='go' /></form>" if File.exists?(fileInfo.path) and params[:yes].nil?
 	 #raise i18n.errors.errorType(fileInfo[:mime], params[:type]) if !params[:type].nil? and params[:type] != fileInfo[:type]
      open(fileInfo.path, "wb") { |file|
      file.write(resp.body)
+	 file.close
     }
    }
    rescue 
-        return errorPage(:text=>$!.message, :title=>i18n.errors.title.socket)
+       # return errorPage(:text=>$!.message, :title=>i18n.errors.title.socket)
    end
+   #fileInfo[:i18n] = nil
+   #return fileInfo.inspect
    
 
 
@@ -294,10 +315,12 @@ def load(params)
 		 r.kind = params[:type] unless params[:type].nil?
 		 r.mimetype = params[:mime] unless params[:mime].nil?
 		 r.sourceURL = params[:url] unless params[:url].nil?
-		 if RUBY_PLATFORM.match(/win/) and !params[:path].nil?
-			ic = Iconv.new('UTF-8','WINDOWS-1251')
-			r.filepath = ic.iconv(params[:path])
-		 end
+		 #if RUBY_PLATFORM.match(/win/) and !params[:path].nil?
+		 #	ic = Iconv.new('UTF-8','WINDOWS-1251')
+		 #	r.filepath = ic.iconv(params[:path])
+		 #end
+		 r.filepath = params[:path] unless params[:path].nil?
+		 
 		 r.title = params[:title] unless params[:title].nil?
 		 r.tags = params[:tags] unless params[:tags].nil?
 		 r.date = DateTime::now()
@@ -478,7 +501,11 @@ get '/delete/:id' do
 	end
 	 return errorPage(:text=>i18n.delete.withAttachOrNo+"<br /><a href='/delete/#{params[:id]}?attach=yes'>#{i18n.__yes}</a> | <a href='/delete/#{params[:id]}?attach=no'>#{i18n.__no}</a>", :title=>i18n.errors.title.changeTypeOfDeleting) if(params[:attach].nil? or ("yes"!=params[:attach] and "no"!=params[:attach]))
 
-
+	if RUBY_PLATFORM.match(/win/)
+		ic = Iconv.new('WINDOWS-1251','UTF-8')
+		r.filepath = ic.iconv(r.filepath)
+	end
+	
 	begin
 		r.deleteAttach if("yes"==params[:attach])
 	rescue
