@@ -3,22 +3,26 @@ require 'yaml'
 require 'uri'
 require 'net/http'
 require 'find'
+require 'russian'
 
 Kernel::system('chcp 1251>nul')
 
 
 
 
+task :test do
+  input = ENV["input"]
+  p Dir[input+'/*.*']
+end
 
 
 
-$syshash = "\\"
 
 
 #task :default => :add
 
 def log(text)
-	File.open("rakelog.txt", "a+"){|f| f.write(text+"\n");}
+	File.open("rakelog.txt", "a+"){|f| f.write(DateTime::now.to_s+"  "+text+"\n");}
 end
 
 desc "Task for Adding"
@@ -32,7 +36,7 @@ task :add => :environment do
 		
 		log "#{ENV["input"]} started..."
 		
-		if("\\"==$syshash)
+		if RUBY_PLATFORM.match(/win/)
 			class Resource < ActiveRecord::Base
 				def haveDouble?
 					Resource.exists?(:filepath=>self.filepath) or Resource.exists?(:filepath=>((File.dirname __FILE__)+"\\"+self.filepath).gsub("/","\\")) or Resource.exists?(:filepath=>"./"+self.filepath)
@@ -72,8 +76,17 @@ task :add => :environment do
 end
 
 
+
+
 def look4File f, params
+
+	if RUBY_PLATFORM.match(/win/)
+		ic = Iconv.new('UTF-8','WINDOWS-1251')
+		f = ic.iconv(f)
+	end
+
 	title = File.basename f
+	
 
 	description = ENV["descr"]
 
@@ -83,9 +96,13 @@ def look4File f, params
 		 description = "Author: #{m[2]}" if description.nil?
 	end
 	
+
 	
 	res = Resource.new :filepath=>f, :title=>title, :description=>description, :mimetype=>params[:mimetype], :kind=>params[:kind], :tags=>ENV['tags'], :date=>DateTime::now()
-	return false if res.haveDouble?
+	if res.haveDouble?
+		puts "#{f} have not added: have doubles."
+		return false
+	end
 	puts "#{f} added"
 	log "#{f} added"
 	res.save
@@ -110,39 +127,66 @@ end
 $infoHash = {"jpg"=>"image/jpeg", "gif"=>"image/gif", "png"=>"image/png"}
 
 def loadFile ( params )
-
    fileInfo = {}
+   
    def fileInfo.filename
 		raise "Have not extension" if self[:ext].nil?
 		raise "Have not title" if self[:title].nil?
-		self[:title]+"."+self[:ext]
+		fn = self[:title]+"."+self[:ext]
+		if RUBY_PLATFORM.match(/win/)
+			ic = Iconv.new('WINDOWS-1251','UTF-8')
+			fn = ic.iconv(fn)
+		end
+		fn
    end
    
    def fileInfo.path
 		"static/resources/"+self.filename
    end
-   
-   
-   begin 
-	 url = URI.parse(params[:url])
-	 matches = (File.basename url.path).split(/([a-zA-Z0-9]+).([a-zA-Z0-9]+)$/)
-	 raise "it is not file name" if matches.length<3
-	 fileInfo[:title] = ENV["defaultTitle"].nil? ? matches[1] : ENV["dTitle"]
-	 fileInfo[:ext] = matches[2]
+   s = ""
+    begin
+		begin
+			url = URI.parse(params[:url])
+		rescue 
+			url = URI.parse(URI.encode params[:url])
+		end
+	 s = (File.basename URI.decode url.path).gsub(/[\?\*\|<>\\\/\:]/, "")
+	 matches = s.split(/.([a-zA-Z0-9]{3,4})$/)
+	 s = matches
+	 if matches.length>1
+		fileInfo[:title] = params[:defaultTitle].nil? ? matches[0] : params[:defaultTitle]
+		fileInfo[:ext] = matches[1]
+	 else
+		fileInfo[:title] = s
+		fileInfo[:ext] = nil
+	 end
+	 
+
+	 
    rescue 
      return "Parsing error: "+$!.message
    end
+   
 
    
    request = Net::HTTP::Get.new(url.path)
 	
   begin
     res = Net::HTTP.start(url.host, url.port) {|http|
-     raise 'file yet exists; try load with param `dTitle`' if File.exists?(fileInfo.path)
      resp = http.get(url.path, "User-Agent" => "Mozilla/5.0 (Windows; U; Windows NT 6.0; ru; rv:1.9.0.10) Gecko/2009042316 Firefox/3.0.10")
 
 	 raise "not found" if resp.code=="404"
 	 fileInfo[:mime] = resp.content_type
+	 	 if fileInfo[:ext].nil?
+		fileInfo[:ext] = case fileInfo[:mime]
+		 when "image/jpeg" then "jpg"
+		 when "image/gif" then "gif"
+		 when "image/png" then "png"
+		 when "text/html" then "html"
+		 else "txt"
+		end
+	 end
+     raise 'file yet exists; try load with param `dTitle`' if File.exists?(fileInfo.path)
 	 fileInfo[:type] = fileInfo[:mime].gsub(/([\w]+)\/(.*)/, '\1')
      open(fileInfo.path, "wb") { |file|
      file.write(resp.body)
@@ -161,7 +205,10 @@ def addResource (params)
 		 r.kind = params[:type] unless params[:type].nil?
 		 r.mimetype = params[:mime] unless params[:mime].nil?
 		 r.sourceURL = params[:url] unless params[:url].nil?
-		 r.filepath = params[:path] unless params[:path].nil?
+		 if RUBY_PLATFORM.match(/win/) and !params[:path].nil?
+			ic = Iconv.new('UTF-8','WINDOWS-1251')
+			r.filepath = ic.iconv(params[:path])
+		 end
 		 r.title = params[:title] unless params[:title].nil?
 		 r.tags = params[:tags] unless params[:tags].nil?
 		 r.date = DateTime::now()

@@ -7,6 +7,8 @@ require 'yaml'
 require 'net/http'
 require 'exifr'
 require 'RMagick'
+require 'uri'
+require 'russian'
 
 
 
@@ -54,8 +56,13 @@ class Resource < ActiveRecord::Base
 		"test"
 	end
 	
+	def editable? field
+		return true if ["description","title","tags"].include? field
+		return false
+	end
+	
 	def outerHelper(field)
-		"<div id='#{field}_container' title='Title'>"+eval("self.#{field}_helper")+"</div>"
+		"<div"+((editable? field) ? " id='#{field}_container' " : "")+" title='Title'>"+eval("self.#{field}_helper")+"</div>"
 	end
 	
 	def title_helper
@@ -203,33 +210,49 @@ def load(params)
  if params[:url]==nil
 	erb :load
  else 
-
-
  
-   require 'uri'
+
+   
    
    fileInfo = {}
    def fileInfo.filename
-		raise i18n.errors.notHaveExt if self[:ext].nil?
-		raise i18n.errors.notHaveTitle if self[:title].nil?
-		self[:title]+"."+self[:ext]
+		raise self[:i18n].errors.notHaveExt if self[:ext].nil?
+		raise self[:i18n].errors.notHaveTitle if self[:title].nil?
+		fn = self[:title]+"."+self[:ext]
+		if RUBY_PLATFORM.match(/win/)
+			ic = Iconv.new('WINDOWS-1251','UTF-8')
+			fn = ic.iconv(fn)
+		end
+		fn
    end
+   fileInfo[:i18n] = i18n
    
    def fileInfo.path
 		"static/resources/"+self.filename
    end
    
-   
-   begin 
-	 url = URI.parse(params[:url])
-	 #matches = url.path.split(/([a-zA-Z0-9]+).([a-zA-Z0-9]+)$/)
-	 matches = (File.basename url.path).split(/([a-zA-Z0-9]+).([a-zA-Z0-9]+)$/)
-	 raise i18n.errors.notFileName if matches.length<3
-	 fileInfo[:title] = params[:defaultTitle].nil? ? matches[1] : params[:defaultTitle]
-	 fileInfo[:ext] = matches[2]
+   s = ""
+   begin
+		begin
+			url = URI.parse(params[:url])
+		rescue 
+			url = URI.parse(URI.encode params[:url])
+		end
+	 s = (File.basename URI.decode url.path).gsub(/[\?\*\|<>\\\/\:]/, "")
+	 matches = s.split(/.([a-zA-Z0-9]{3,4})$/)
+	 if matches.length>1
+		fileInfo[:title] = params[:defaultTitle].nil? ? matches[0] : params[:defaultTitle]
+		fileInfo[:ext] = matches[1]
+	 else
+		fileInfo[:title] = s
+		fileInfo[:ext] = nil
+	 end
+	 
    rescue 
      return errorPage(:text=>$!.message, :title=>i18n.errors.title.parsing)
    end
+   
+   #return fileInfo[:title].inspect
    
    
    request = Net::HTTP::Get.new(url.path)
@@ -237,13 +260,22 @@ def load(params)
     t=""
   begin
     res = Net::HTTP.start(url.host, url.port) {|http|
-     raise i18n.errors.yetExists(fileInfo.filename) + "<br /> <form action='/load' method='get'><input type='hidden' name='url' value='#{params[:url]}' /><input type='text' value='#{fileInfo[:title]}_' name='defaultTitle' /><input type='submit' value='go' /></form>" if File.exists?(fileInfo.path) and params[:yes].nil?
      resp = http.get(url.path, "User-Agent" => "Mozilla/5.0 (Windows; U; Windows NT 6.0; ru; rv:1.9.0.10) Gecko/2009042316 Firefox/3.0.10")
 
 	 raise i18n.errors.notFound if resp.code=="404"
 	 fileInfo[:mime] = resp.content_type
+	 if fileInfo[:ext].nil?
+		fileInfo[:ext] = case fileInfo[:mime]
+		 when "image/jpeg" then "jpg"
+		 when "image/gif" then "gif"
+		 when "image/png" then "png"
+		 when "text/html" then "html"
+		 else "txt"
+		end
+	 end
 	 fileInfo[:type] = fileInfo[:mime].gsub(/([\w]+)\/(.*)/, '\1')
-	 raise i18n.errors.errorType(fileInfo[:mime], params[:type]) if !params[:type].nil? and params[:type] != fileInfo[:type]
+     raise i18n.errors.yetExists(fileInfo.filename) + "<br /> <form action='/load' method='get'><input type='hidden' name='url' value='#{params[:url]}' /><input type='text' value='#{fileInfo[:title]}_' name='defaultTitle' /><input type='submit' value='go' /></form>" if File.exists?(fileInfo.path) and params[:yes].nil?
+	 #raise i18n.errors.errorType(fileInfo[:mime], params[:type]) if !params[:type].nil? and params[:type] != fileInfo[:type]
      open(fileInfo.path, "wb") { |file|
      file.write(resp.body)
     }
@@ -252,7 +284,7 @@ def load(params)
         return errorPage(:text=>$!.message, :title=>i18n.errors.title.socket)
    end
    
-      
+
 
 	  
 	
@@ -262,8 +294,12 @@ def load(params)
 		 r.kind = params[:type] unless params[:type].nil?
 		 r.mimetype = params[:mime] unless params[:mime].nil?
 		 r.sourceURL = params[:url] unless params[:url].nil?
-		 r.filepath = params[:path] unless params[:path].nil?
+		 if RUBY_PLATFORM.match(/win/) and !params[:path].nil?
+			ic = Iconv.new('UTF-8','WINDOWS-1251')
+			r.filepath = ic.iconv(params[:path])
+		 end
 		 r.title = params[:title] unless params[:title].nil?
+		 r.tags = params[:tags] unless params[:tags].nil?
 		 r.date = DateTime::now()
 		end
 		r.save
@@ -288,11 +324,14 @@ get '/res/img/:id/full' do
 	end
 	
 	header['Content-type'] = $r.mimetype
+	
+	
 		
 	begin
 		File.open($r.filepath).binmode.read
 	rescue
-		notFoundImage
+		img = Magick::Image.read($r.filepath).first
+		img.to_blob
 	end
 end
 
@@ -304,7 +343,7 @@ get '/res/img/:id' do
 	rescue
 		return errorPage(:text=>$!.message, :title=>"Resource ##{params[:id]} not found")
 	end
-	
+
 	header['Content-type'] = $r.mimetype
 		
 	begin
@@ -390,6 +429,8 @@ def res(params)
 	rescue
 		return errorPage(:text=>$!.message, :title=>"Resource ##{params[:id]} not found")
 	end
+	
+	
 	
 	
 	def $r.path
